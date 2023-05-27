@@ -52,23 +52,16 @@ def main():
 
     project_path = '/Users/masaori/git/masaori/auto-test-writer-example-typescript'
     output_instruction = f"""
-                When responding to me, please output a response in one of two options as JSON string:
-                    - No need to include any explanation.
-                    - No need to make your JSON as a code block. Just a plain JSON string.
-                    
-                **Option #1:**
+                When responding to me, please output a response in the following JSON format:
                 {{
                     "thought": string \\ The thought that led to this action
-                    "action": string \\ The action to take. Must be one of {tool_names}
+                    "action": string \\ The action to take. Must be one of {tool_names}. If you want to stop this conversation, please set this to "Final Answer".
                     "action_input": string \\ The input to the action
-                    "save_to_history": bool \\ In order to reduce the token amount, please set this to True only when you need to refer to this action plan in the future.
+                    "save_to_history": bool \\ In order to reduce the token amount, please set this to False as possible if you don't need to refer the result of this action in the future.
                 }}
 
-                **Option #2:**
-                {{
-                    "action": "Final Answer",
-                    "action_input": string \\ You should put what you want to return to use here
-                }}
+                - No need to include any explanation.
+                - No need to make your JSON as a code block. Just a plain JSON string.
                 """
 
     action_plan_history = []
@@ -78,7 +71,7 @@ def main():
         print('')
         print('')
         print(
-            f"==== Start Action ==== {action_iteration_time} {error_in_previous_time} {action_plan_history}")
+            f"==== Start Action ==== {action_iteration_time}")
         action_iteration_time += 1
 
         prompt = f"""
@@ -87,9 +80,9 @@ def main():
 
             What I want you to do:
                 1. Write a Test
-                    - Please make a new branch with appropriate name.
-                    - Please write a test file for the follwoing .ts file.
-                        - Target ts File is /Users/masaori/git/masaori/auto-test-writer-example-typescript/src/domain/usecases/CreateUserUsecase.ts
+                    - Please make a new branch with appropriate name and make sure that your branch is up to date.
+                    - Please find the .ts file which has no test file.
+                    - Please write a test file for the file.
                     - Please check the type definitions those are related to the target ts file.
                     - Please output the test file at the same directory as the actual ts file.
                 2. Check your Test file
@@ -109,6 +102,8 @@ def main():
                     - `cd {project_path} && git status`
                 - If you want to make your own branch, please run the following command:
                     - `cd {project_path} && git checkout -b <your branch name>`
+                - If you want to update your branch, please run the following command:
+                    - `cd {project_path} && git pull --rebase origin main`
                 - If you want to commit your changes, please run the following command:
                     - `cd {project_path} && git add . && git commit -m "<appropriate commit message>" && git push -u origin <your branch name>`
                 - If you want to make Pull Request, you can use the following shell command:
@@ -136,7 +131,9 @@ def main():
             action_plan = json.loads(action_plan_output)
             if action_plan['action'] == 'Final Answer':
                 print('==== Final Answer ====')
-                print(action_plan['action_input'])
+                print(json.dumps(action_plan, indent=4))
+                print('==== Action Plan History ====')
+                print(json.dumps(action_plan_history, indent=4))
                 break
 
             print('==== Action Plan ====')
