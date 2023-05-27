@@ -26,11 +26,11 @@ def main():
     llm = ChatOpenAI(model_name='gpt-4')
 
     tools: list[BaseTool] = [
-        ShellTool("""Use this to run shell command.
+        ShellTool(description="""Use this to run shell command.
             Please move to the project directory before running the command like this:
             cd <absolute/path/to/project> && <command>
         """),
-        ReadFileTool("""Use this to read file from specific path you want to read.
+        ReadFileTool(description="""Use this to read file from specific path you want to read.
             Please make sure that the file exists with using ListDirectoryTool.
         """),
         WriteFileTool(
@@ -50,6 +50,8 @@ def main():
     tool_descriptions = [f"{tool.name}: {tool.description}" for tool in tools]
     tool_names = [tool.name for tool in tools]
 
+    project_path = '/Users/masaori/git/masaori/auto-test-writer-example-typescript'
+
     action_plan_history = []
     last_output = None
     action_times = 0
@@ -59,13 +61,16 @@ def main():
         action_times += 1
 
         prompt = f"""
+            Project Path:
+            {project_path}
+
             What I want you to do:
                 1. Write a Test
                     - Please make a new branch with appropriate name.
                     - Please write a test file for the follwoing .ts file.
                         - Target ts File /Users/masaori/git/masaori/auto-test-writer-example-typescript/src/domain/usecases/CreateUserUsecase.ts
+                    - Please check the type definitions those are related to the target ts file.
                     - Please output the test file at the same directory as the actual ts file.
-                    - If you need, please read associated files seeing import statements.
                 2. Check your Test file
                     - Please check if the transpiling succeeds.
                     - Please check if your tests pass correctly.
@@ -76,17 +81,17 @@ def main():
 
             Tips:
                 - If you want to check if the typescript code transpiles properly, please run the following command:
-                    - `npx tsc --noEmit`
+                    - `cd {project_path} && npx tsc --noEmit`
                 - If you want to check if the test code succeeds, please run the following command:
-                    - `npx jest <path/to/test/file>`
+                    - `cd {project_path} && npx jest <path/to/test/file>`
                 - If you want to check current git status, you can use the following shell command:
-                    - `git status`
+                    - `cd {project_path} && git status`
                 - If you want to make your own branch, please run the following command:
-                    - `git checkout -b <your branch name>`
+                    - `cd {project_path} && git checkout -b <your branch name>`
                 - If you want to commit your changes, please run the following command:
-                    - `git add . && git commit -m "<appropriate commit message>" && git push -u origin <your branch name>`
+                    - `cd {project_path} && git add . && git commit -m "<appropriate commit message>" && git push -u origin <your branch name>`
                 - If you want to make Pull Request, you can use the following shell command:
-                    - `gh pr create --base main --title "<Your PR title>" --body "<Your PR body>"`
+                    - `cd {project_path} && gh pr create --base main --title "<Your PR title>" --body "<Your PR body>"`
 
             Tools you can use:
             {tool_descriptions}
@@ -143,7 +148,7 @@ def main():
         except KeyError as e:
             print(f"==== Key Error ==== {action_plan_output}")
             last_output = {
-                "error_message": f"Failed to find key {e.args} in your response. Please try again.",
+                "error_message": f"Failed to find key in your response. Please try again. {str(e)}",
             }
             continue
         except Exception as e:
@@ -182,12 +187,14 @@ def main():
         print('==== Tool Output ====')
         print(tool_output)
 
-        action_plan_history.append({
+        last_output = {
             "thought": action_plan['thought'],
             "action": action_plan['action'],
             "action_input": action_plan['action_input'],
             "tool_output": tool_output,
-        })
+        }
+        if action_plan['save_to_history']:
+            action_plan_history.append(last_output)
 
 
 try:
