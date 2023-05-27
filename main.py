@@ -51,14 +51,35 @@ def main():
     tool_names = [tool.name for tool in tools]
 
     project_path = '/Users/masaori/git/masaori/auto-test-writer-example-typescript'
+    output_instruction = f"""
+                When responding to me, please output a response in one of two options as JSON string:
+                    - No need to include any explanation.
+                    - No need to make your JSON as a code block. Just a plain JSON string.
+                    
+                **Option #1:**
+                {{
+                    "thought": string \\ The thought that led to this action
+                    "action": string \\ The action to take. Must be one of {tool_names}
+                    "action_input": string \\ The input to the action
+                    "save_to_history": bool \\ In order to reduce the token amount, please set this to True only when you need to refer to this action plan in the future.
+                }}
+
+                **Option #2:**
+                {{
+                    "action": "Final Answer",
+                    "action_input": string \\ You should put what you want to return to use here
+                }}
+                """
 
     action_plan_history = []
-    last_output = None
-    action_times = 0
+    error_in_previous_time = None
+    action_iteration_time = 0
     while True:
-        print('====')
-        print(f"==== Start Action ==== {action_times}")
-        action_times += 1
+        print('')
+        print('')
+        print(
+            f"==== Start Action ==== {action_iteration_time} {error_in_previous_time} {action_plan_history}")
+        action_iteration_time += 1
 
         prompt = f"""
             Project Path:
@@ -68,7 +89,7 @@ def main():
                 1. Write a Test
                     - Please make a new branch with appropriate name.
                     - Please write a test file for the follwoing .ts file.
-                        - Target ts File /Users/masaori/git/masaori/auto-test-writer-example-typescript/src/domain/usecases/CreateUserUsecase.ts
+                        - Target ts File is /Users/masaori/git/masaori/auto-test-writer-example-typescript/src/domain/usecases/CreateUserUsecase.ts
                     - Please check the type definitions those are related to the target ts file.
                     - Please output the test file at the same directory as the actual ts file.
                 2. Check your Test file
@@ -94,35 +115,19 @@ def main():
                     - `cd {project_path} && gh pr create --base main --title "<Your PR title>" --body "<Your PR body>"`
 
             Tools you can use:
-            {tool_descriptions}
+            {json.dumps(tool_descriptions, indent=4)}
 
             Output:
-            When responding to me, please output a response in one of two formats:
-
-            **Option #1:**
-            Use this if you want the human to use a tool.
-            Markdown code snippet formatted in the following schema:
-
-            {{
-                "thought": string \\ The thought that led to this action
-                "action": string \\ The action to take. Must be one of {tool_names}
-                "action_input": string \\ The input to the action
-                "save_to_history": bool \\ Whether to save this action and the output of tools to the history
-            }}
-
-            **Option #2:**
-            Use this if you want to respond directly to the human. Markdown code snippet formatted in the following schema:
-
-            {{
-                "action": "Final Answer",
-                "action_input": string \\ You should put what you want to return to use here
-            }}
-
-            Last Output:
-            {last_output}
+                {output_instruction}
 
             History of your past Action Plans:
-            {action_plan_history}
+                {json.dumps(action_plan_history, indent=4)}
+        """ if error_in_previous_time is None else f"""
+            Please address the error in previous time:
+                {json.dumps(error_in_previous_time, indent=4)}
+
+            Output:
+                {output_instruction}
         """
 
         action_plan_output = llm.predict(prompt)
@@ -141,14 +146,16 @@ def main():
             print(f"Save to History: {action_plan['save_to_history']}")
         except json.decoder.JSONDecodeError as e:
             print(f"==== JSON Decode Error ==== {action_plan_output}")
-            last_output = {
-                "error_message": "Failed to decode your response as JSON. Please try again.",
+            error_in_previous_time = {
+                "error_message": f"Failed to decode your response as JSON. Please try again. {str(e)}",
+                "your_response": action_plan_output,
             }
             continue
         except KeyError as e:
-            print(f"==== Key Error ==== {action_plan_output}")
-            last_output = {
-                "error_message": f"Failed to find key in your response. Please try again. {str(e)}",
+            print(f"==== Key Error ==== {action_plan_output} {str(e)}")
+            error_in_previous_time = {
+                "error_message": f"Failed to find key ({str(e)}) in your response. Please try again.",
+                "your_response": action_plan,
             }
             continue
         except Exception as e:
@@ -162,8 +169,9 @@ def main():
                 break
         if target_tool is None:
             print(f"==== Tool Not Found ==== {action_plan_output}")
-            last_output = {
+            error_in_previous_time = {
                 "error_message": f"Failed to find tool {action_plan['action']} in your response. Please try again.",
+                "your_response": action_plan_output,
             }
             continue
 
@@ -187,14 +195,16 @@ def main():
         print('==== Tool Output ====')
         print(tool_output)
 
-        last_output = {
-            "thought": action_plan['thought'],
-            "action": action_plan['action'],
-            "action_input": action_plan['action_input'],
-            "tool_output": tool_output,
-        }
         if action_plan['save_to_history']:
-            action_plan_history.append(last_output)
+            action_plan_history.append({
+                "action_iteration_time": action_iteration_time,
+                "thought": action_plan['thought'],
+                "action": action_plan['action'],
+                "action_input": action_plan['action_input'],
+                "tool_output": tool_output,
+            })
+
+        error_in_previous_time = None
 
 
 try:
