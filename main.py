@@ -89,6 +89,7 @@ def main():
                     - Please check if the transpiling succeeds.
                     - Please check if your tests pass correctly.
                     - If it fails, please fix your test file.
+                    - Please check the coverage and try to improve as possible. No need to make it 100%.
                 3. Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, please commit your test file.
                     - Please make a pull request to the main branch.
@@ -97,7 +98,7 @@ def main():
                 - If you want to check if the typescript code transpiles properly, please run the following command:
                     - `cd {project_path} && npx tsc --noEmit`
                 - If you want to check if the test code succeeds, please run the following command:
-                    - `cd {project_path} && npx jest <path/to/test/file>`
+                    - `cd {project_path} && npx jest <path/to/test/file>`--coverage --collectCoverageFrom=<path/to/test/file>
                 - If you want to check current git status, you can use the following shell command:
                     - `cd {project_path} && git status`
                 - If you want to make your own branch, please run the following command:
