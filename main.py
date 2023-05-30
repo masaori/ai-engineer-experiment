@@ -59,7 +59,6 @@ def main():
                     "thought": string \\ The thought that led to this action
                     "action": string \\ The action to take. Must be one of {tool_names}. If you want to stop this conversation, please set this to "Final Answer".
                     "action_input": string \\ The input to the action
-                    "save_to_history": bool \\ In order to reduce the token amount, please set this to False as possible if you don't need to refer the result of this action in the future.
                 }}
 
                 - No need to include any explanation.
@@ -142,7 +141,6 @@ def main():
             print(f"Thought: {action_plan['thought']}")
             print(f"Action: {action_plan['action']}")
             print(f"Action Input: {action_plan['action_input']}")
-            print(f"Save to History: {action_plan['save_to_history']}")
         except json.decoder.JSONDecodeError as e:
             print(f"==== JSON Decode Error ==== {action_plan_output}")
             error_in_previous_time = {
@@ -194,14 +192,13 @@ def main():
         print('==== Tool Output ====')
         print(tool_output)
 
-        if action_plan['save_to_history']:
-            action_plan_history.append({
-                "action_iteration_time": action_iteration_time,
-                "thought": action_plan['thought'],
-                "action": action_plan['action'],
-                "action_input": action_plan['action_input'],
-                "tool_output": tool_output,
-            })
+        action_plan_history.append({
+            "action_iteration_time": action_iteration_time,
+            "thought": action_plan['thought'],
+            "action": action_plan['action'],
+            "action_input": action_plan['action_input'],
+            "tool_output": tool_output,
+        })
 
         error_in_previous_time = None
 
