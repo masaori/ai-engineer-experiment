@@ -7,19 +7,20 @@ from langchain.tools.file_management import (
 )
 from langchain.tools import ShellTool, BaseTool
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import AgentType, AgentExecutor, ConversationalChatAgent, ZeroShotAgent
-from langchain.agents import initialize_agent
-from langchain.agents import load_tools
-from langchain.agents.conversational_chat.output_parser import ConvoOutputParser, FORMAT_INSTRUCTIONS
-from langchain.memory import ConversationBufferMemory
 import os
+import argparse
+
+parser = argparse.ArgumentParser(
+    prog='Auto Test Writer',
+    description='Write a test file automatically',
+    epilog='Enjoy the program! :)')
+parser.add_argument(
+    '-p', '--project_path', help='The absolute path to the project you want to write a test file for', required=True)
+parser.add_argument(
+    '-f', '--file_path', help='The absolute path to the file you want to write a test file for', required=True)
+args = parser.parse_args()
 
 os.environ["OPENAI_API_KEY"] = open("./openapi_key.txt", "r").read().strip()
-
-# output_parser = Gpt4OutputParser()
-# output_parser = ConvoOutputParser()
-# memory = ConversationBufferMemory(
-#     memory_key="chat_history", return_messages=True)
 
 
 def main():
@@ -50,7 +51,8 @@ def main():
     tool_descriptions = [f"{tool.name}: {tool.description}" for tool in tools]
     tool_names = [tool.name for tool in tools]
 
-    project_path = '/Users/masaori/git/masaori/auto-test-writer-example-typescript'
+    project_path = args.project_path
+    file_path = args.file_path
     output_instruction = f"""
                 When responding to me, please output a response in the following JSON format:
                 {{
@@ -81,15 +83,14 @@ def main():
             What I want you to do:
                 1. Write a Test
                     - Please make a new branch with appropriate name and make sure that your branch is up to date.
-                    - Please find the .ts file which has no test file.
-                    - Please write a test file for the file.
-                    - Please check the type definitions those are related to the target ts file.
-                    - Please output the test file at the same directory as the actual ts file.
+                    - Please write a test file for {file_path}
+                        - Please check the type definitions those are related to the target ts file.
+                        - Please output the test file at the same directory as the specified ts file.
+                    - Please aim to write a test file that covers as much of the test cases as possible.
                 2. Check your Test file
                     - Please check if the transpiling succeeds.
                     - Please check if your tests pass correctly.
                     - If it fails, please fix your test file.
-                    - Please check the coverage and try to improve as possible. No need to make it 100%.
                 3. Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, please commit your test file.
                     - Please make a pull request to the main branch.
