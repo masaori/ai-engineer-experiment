@@ -9,6 +9,7 @@ from langchain.tools import ShellTool, BaseTool
 from langchain.chat_models import ChatOpenAI
 import os
 import argparse
+from openai.error import InvalidRequestError
 
 parser = argparse.ArgumentParser(
     prog='Auto Test Writer',
@@ -18,6 +19,8 @@ parser.add_argument(
     '-p', '--project_path', help='The absolute path to the project you want to write a test file for', required=True)
 parser.add_argument(
     '-f', '--file_path', help='The absolute path to the file you want to write a test file for', required=True)
+parser.add_argument(
+    '-r', '--role', help='chose writer or planner', required=True, default='writer')
 args = parser.parse_args()
 
 os.environ["OPENAI_API_KEY"] = open("./openapi_key.txt", "r").read().strip()
@@ -45,8 +48,6 @@ def main():
             }}
         """),
         ListDirectoryTool(),
-        # TODO: Make custom tool using gh command
-        # TODO: Make custom tool using git command
     ]
     tool_descriptions = [f"{tool.name}: {tool.description}" for tool in tools]
     tool_names = [tool.name for tool in tools]
@@ -65,6 +66,24 @@ def main():
                 - No need to make your JSON as a code block. Just a plain JSON string.
                 """
 
+    what_i_want_you_to_do = f"""
+                1. Create a Test Plan for {file_path}
+                    - Sort out every test cases and write each down in a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
+    """ if args.role == 'planner' else f"""
+                1. Find a Test Plan for {file_path}
+                    - Find a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
+                2. Choose one of them and write a Test file for {file_path}
+                    - Write a test file as <file_name>.test.<number>.ts at the same directory as the specified file
+                    - Aim to write a test file that covers as much of the test cases as possible.
+                3. Check your Test file
+                    - Check if the transpiling succeeds.
+                    - Check if your tests pass correctly.
+                    - If it fails, Fix your test file.
+                4. Commit your Test file and Make Pull Request
+                    - After you confirm that your test file is correct, Commit your test file.
+                    - Make a pull request to the main branch.
+    """
+
     action_plan_history = []
     error_in_previous_time = None
     action_iteration_time = 0
@@ -80,19 +99,7 @@ def main():
             {project_path}
 
             What I want you to do:
-                1. Write a Test
-                    - Please make a new branch with appropriate name and make sure that your branch is up to date.
-                    - Please write a test file for {file_path}
-                        - Please check the type definitions those are related to the target ts file.
-                        - Please output the test file at the same directory as the specified ts file.
-                    - Please aim to write a test file that covers as much of the test cases as possible.
-                2. Check your Test file
-                    - Please check if the transpiling succeeds.
-                    - Please check if your tests pass correctly.
-                    - If it fails, please fix your test file.
-                3. Commit your Test file and Make Pull Request
-                    - After you confirm that your test file is correct, please commit your test file.
-                    - Please make a pull request to the main branch.
+            {what_i_want_you_to_do}
 
             Tips:
                 - If you want to check if the typescript code transpiles properly, please run the following command:
@@ -126,7 +133,16 @@ def main():
                 {output_instruction}
         """
 
-        action_plan_output = llm.predict(prompt)
+        try:
+            action_plan_output = llm.predict(prompt)
+        except InvalidRequestError as e:
+            # token limit exceeded
+            print(f"==== Token Limit Exceeded ==== {e}")
+            # remove the oldest action plan from history
+            action_plan_history.pop(0)
+            continue
+        except Exception as e:
+            raise e
 
         try:
             action_plan = json.loads(action_plan_output)
