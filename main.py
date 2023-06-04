@@ -1,4 +1,5 @@
 import json
+import time
 from langchain.callbacks import get_openai_callback
 from langchain.tools.file_management import (
     ReadFileTool,
@@ -20,7 +21,7 @@ parser.add_argument(
 parser.add_argument(
     '-f', '--file_path', help='The absolute path to the file you want to write a test file for', required=True)
 parser.add_argument(
-    '-r', '--role', help='chose writer or planner', required=True, default='writer')
+    '-r', '--role', help='chose writer or planner', required=False, default='writer')
 args = parser.parse_args()
 
 os.environ["OPENAI_API_KEY"] = open("./openapi_key.txt", "r").read().strip()
@@ -66,22 +67,45 @@ def main():
                 - No need to make your JSON as a code block. Just a plain JSON string.
                 """
 
+    # what_i_want_you_to_do = f"""
+    #             1. Create a Test Plan for {file_path}
+    #                 - Sort out every test cases and write each down in a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
+    # """ if args.role == 'planner' else f"""
+    #             1. Find a Test Plan for {file_path}
+    #                 - Find a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
+    #             2. Choose one of them and write a Test file for {file_path}
+    #                 - Write a test file as <file_name>.test.<number>.ts at the same directory as the specified file
+    #                 - Aim to write a test file that covers as much of the test cases as possible.
+    #             3. Check your Test file
+    #                 - Check if the transpiling succeeds.
+    #                 - Check if your tests pass correctly.
+    #                 - If it fails, Fix your test file.
+    #             4. Commit your Test file and Make Pull Request
+    #                 - After you confirm that your test file is correct, Commit your test file.
+    #                 - Make a pull request to the main branch.
+    # """
+
+    # what_i_want_you_to_do = f"""
+    #             1. Write a test file for {file_path} with jest
+    #                 - Write a test file at the same directory as the specified file
+    #                 - Aim to write a test file that covers as much of the test cases as possible.
+    #             2. Check your Test file
+    #                 - Check if the transpiling succeeds.
+    #                 - Check if your tests pass correctly.
+    #                 - If it fails, Fix your test file.
+    #             3. Commit your Test file and Make Pull Request
+    #                 - After you confirm that your test file is correct, Commit your test file.
+    #                 - Make a pull request to the main branch.
+    # """
+
     what_i_want_you_to_do = f"""
-                1. Create a Test Plan for {file_path}
-                    - Sort out every test cases and write each down in a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
-    """ if args.role == 'planner' else f"""
-                1. Find a Test Plan for {file_path}
-                    - Find a test plan file as <file_name>.testplan.<number>.txt at the same directory as the specified file
-                2. Choose one of them and write a Test file for {file_path}
-                    - Write a test file as <file_name>.test.<number>.ts at the same directory as the specified file
-                    - Aim to write a test file that covers as much of the test cases as possible.
-                3. Check your Test file
-                    - Check if the transpiling succeeds.
-                    - Check if your tests pass correctly.
-                    - If it fails, Fix your test file.
-                4. Commit your Test file and Make Pull Request
-                    - After you confirm that your test file is correct, Commit your test file.
-                    - Make a pull request to the main branch.
+                0. Make your own branch
+                1. Split the file {file_path} into multiple files.
+                    - Each file should include only one class or function.
+                    - Name each file as <file_name>.<class_name>.ts or <file_name>.<function_name>.ts
+                    - Put each file into the same directory as the specified file.
+                2. Check if the transpiling succeeds.
+                3. DO NOT forget to commit your changes and Make Pull Request
     """
 
     action_plan_history = []
@@ -105,7 +129,7 @@ def main():
                 - If you want to check if the typescript code transpiles properly, please run the following command:
                     - `cd {project_path} && npx tsc --noEmit`
                 - If you want to check if the test code succeeds, please run the following command:
-                    - `cd {project_path} && npx jest <path/to/test/file>`--coverage --collectCoverageFrom=<path/to/test/file>
+                    - `cd {project_path} && npx jest <path/to/test/file> --coverage --collectCoverageFrom=<path/to/test/file>
                 - If you want to check current git status, you can use the following shell command:
                     - `cd {project_path} && git status`
                 - If you want to make your own branch, please run the following command:
@@ -133,16 +157,26 @@ def main():
                 {output_instruction}
         """
 
-        try:
-            action_plan_output = llm.predict(prompt)
-        except InvalidRequestError as e:
-            # token limit exceeded
-            print(f"==== Token Limit Exceeded ==== {e}")
-            # remove the oldest action plan from history
-            action_plan_history.pop(0)
-            continue
-        except Exception as e:
-            raise e
+        with get_openai_callback() as callback:
+            try:
+                start_time = time.time()
+                action_plan_output = llm.predict(prompt)
+                elapsed_time = time.time() - start_time
+                print(f"    Request Time: {elapsed_time}")
+            except InvalidRequestError as e:
+                # token limit exceeded
+                print(f"==== Token Limit Exceeded ==== {e}")
+                # remove the oldest action plan from history
+                action_plan_history.pop(0)
+                continue
+            except Exception as e:
+                raise e
+
+            print("    total_cost:", callback.total_cost)
+            print("    total_tokens:", callback.total_tokens)
+            print("    prompt_tokens:", callback.prompt_tokens)
+            print("    successful_requests:", callback.successful_requests)
+            print("    completion_tokens:", callback.completion_tokens)
 
         try:
             action_plan = json.loads(action_plan_output)
