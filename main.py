@@ -6,22 +6,29 @@ from langchain.tools.file_management import (
     WriteFileTool,
     ListDirectoryTool,
 )
-from langchain.tools import ShellTool, BaseTool
+from langchain.tools import BaseTool
 from langchain.chat_models import ChatOpenAI
 import os
 import argparse
 from openai.error import InvalidRequestError
+
+from tools import ReadAndMemorizeFileTool, ShellTool
+
 
 parser = argparse.ArgumentParser(
     prog='Auto Test Writer',
     description='Write a test file automatically',
     epilog='Enjoy the program! :)')
 parser.add_argument(
-    '-p', '--project_path', help='The absolute path to the project you want to write a test file for', required=True)
+    '-p', '--project_path', help='The absolute path to the project you want to work on', required=True)
 parser.add_argument(
-    '-f', '--file_path', help='The absolute path to the file you want to write a test file for', required=True)
+    '-f', '--file_path', help='The absolute path to the file you want to work on', required=True)
 parser.add_argument(
-    '-r', '--role', help='chose writer or planner', required=False, default='writer')
+    '-d', '--dir_path', help='The absolute path to the directory you want to work on', required=False)
+parser.add_argument(
+    '-t', '--task-type', help='The task type you want to do.', required=True)
+
+
 args = parser.parse_args()
 
 os.environ["OPENAI_API_KEY"] = open("./openapi_key.txt", "r").read().strip()
@@ -31,11 +38,20 @@ def main():
     llm = ChatOpenAI(model_name='gpt-4')
 
     tools: list[BaseTool] = [
-        ShellTool(description="""Use this to run shell command.
-            Please move to the project directory before running the command like this:
-            cd <absolute/path/to/project> && <command>
+        ShellTool(
+            project_path=args.project_path,
+            description="""Use this to run shell commands.
+
+            Input Format (Array in JSON string):
+            [
+                "command A",
+                "command B",
+            ]
         """),
-        ReadFileTool(description="""Use this to read file from specific path you want to read.
+        ReadFileTool(description="""Use this to read file from specific absolute path.
+            Please make sure that the file exists with using ListDirectoryTool.
+        """),
+        ReadAndMemorizeFileTool(description="""Use this to read file from specific absolute path when you want to memoize this file.
             Please make sure that the file exists with using ListDirectoryTool.
         """),
         WriteFileTool(
@@ -55,6 +71,8 @@ def main():
 
     project_path = args.project_path
     file_path = args.file_path
+    dir_path = args.dir_path
+    task_type = args.task_type
     output_instruction = f"""
                 When responding to me, please output a response in the following JSON format:
                 {{
@@ -85,30 +103,46 @@ def main():
     #                 - Make a pull request to the main branch.
     # """
 
-    # what_i_want_you_to_do = f"""
-    #             1. Write a test file for {file_path} with jest
-    #                 - Write a test file at the same directory as the specified file
-    #                 - Aim to write a test file that covers as much of the test cases as possible.
-    #             2. Check your Test file
-    #                 - Check if the transpiling succeeds.
-    #                 - Check if your tests pass correctly.
-    #                 - If it fails, Fix your test file.
-    #             3. Commit your Test file and Make Pull Request
-    #                 - After you confirm that your test file is correct, Commit your test file.
-    #                 - Make a pull request to the main branch.
-    # """
-
     what_i_want_you_to_do = f"""
                 0. Make your own branch
-                1. Split the file {file_path} into multiple files.
-                    - Each file should include only one class or function.
-                    - Name each file as <file_name>.<class_name>.ts or <file_name>.<function_name>.ts
+                1. Write a test file for {file_path} with jest
+                    - Write a test file at the same directory as the specified file
+                    - Aim to write a test file that covers as much of the test cases as possible.
+                2. Check your Test file
+                    - Check if the transpiling succeeds.
+                    - Check if your tests pass correctly.
+                    - If it fails, Fix your test file.
+                3. Commit your Test file and Make Pull Request
+                    - After you confirm that your test file is correct, Commit your test file.
+                    - Make a pull request to the main branch.
+    """ if task_type == "write_test" else f"""
+                0. Make your own branch
+                1. Find the ts file in {dir_path} which doesn't have a test.ts file.
+                2. Write a test file for the file with jest
+                    - Write a test file at the same directory as the specified file
+                    - Aim to write a test file that covers as much of the test cases as possible.
+                3. Check your Test file
+                    - Check if the transpiling succeeds.
+                    - Check if your tests pass correctly.
+                    - If it fails, Fix your test file.
+                4. Commit your Test file and Make Pull Request
+                    - After you confirm that your test file is correct, Commit your test file.
+                    - Make a pull request to the main branch.
+    """ if task_type == "find_and_write_test" else f"""
+                0. Make your own branch
+                1. Split the file {file_path} into multiple files for each exported type definition.
+                    - Each file should include only one type definition.
+                    - Name each file as <file_name>.<type_name>.ts
                     - Put each file into the same directory as the specified file.
                 2. Check if the transpiling succeeds.
                 3. DO NOT forget to commit your changes and Make Pull Request
-    """
+    """ if task_type == "split_file" else None
 
-    action_plan_history = []
+    if what_i_want_you_to_do is None:
+        raise Exception(
+            f"Invalid task type. Please specify one of the following: write_test, split_file")
+
+    memorized_files = []
     error_in_previous_time = None
     action_iteration_time = 0
     while True:
@@ -147,8 +181,8 @@ def main():
             Output:
                 {output_instruction}
 
-            History of your past Action Plans:
-                {json.dumps(action_plan_history, indent=4)}
+            Memorized Files:
+                {json.dumps(memorized_files, indent=4)}
         """ if error_in_previous_time is None else f"""
             Please address the error in previous time:
                 {json.dumps(error_in_previous_time, indent=4)}
@@ -167,7 +201,8 @@ def main():
                 # token limit exceeded
                 print(f"==== Token Limit Exceeded ==== {e}")
                 # remove the oldest action plan from history
-                action_plan_history.pop(0)
+                memorized_files.pop(0)
+                time.sleep(60)
                 continue
             except Exception as e:
                 raise e
@@ -184,7 +219,7 @@ def main():
                 print('==== Final Answer ====')
                 print(json.dumps(action_plan, indent=4))
                 print('==== Action Plan History ====')
-                print(json.dumps(action_plan_history, indent=4))
+                print(json.dumps(memorized_files, indent=4))
                 break
 
             print('==== Action Plan ====')
@@ -242,13 +277,14 @@ def main():
         print('==== Tool Output ====')
         print(tool_output)
 
-        action_plan_history.append({
-            "action_iteration_time": action_iteration_time,
-            "thought": action_plan['thought'],
-            "action": action_plan['action'],
-            "action_input": action_plan['action_input'],
-            "tool_output": tool_output,
-        })
+        if target_tool.name == 'read_and_memorize_file':
+            memorized_files.append({
+                "action_iteration_time": action_iteration_time,
+                "thought": action_plan['thought'],
+                "action": action_plan['action'],
+                "action_input": action_plan['action_input'],
+                "tool_output": tool_output,
+            })
 
         error_in_previous_time = None
 
