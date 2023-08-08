@@ -114,7 +114,7 @@ def main():
                 Please write only one test file in this task following the steps below:
                 - Delete all local branch
                 - Update the repository to latest
-                - Create your own branch with task ID
+                - Create your own branch including Task ID
                 - Find the .ts file in {dir_path} which doesn't have a *.test.ts file.
                 - Write a test file for the file with jest
                     - Write a test file at the same directory as the specified file
