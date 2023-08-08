@@ -180,8 +180,9 @@ def main():
     previous_tool_output = None
     memorized_tool_outputs = []
     error_in_previous_time = None
-    action_iteration_time = 1
+    action_iteration_time = 0
     while True:
+        action_iteration_time += 1
         print('')
         print('')
         print(
@@ -189,7 +190,6 @@ def main():
         # print('== Memory ==')
         # print(json.dumps(memorized_tool_outputs, indent=4))
         print('')
-        action_iteration_time += 1
 
         prompt = base_prompt + f"""
             Previous Tool Output:
@@ -287,12 +287,13 @@ def main():
         print(tool_output)
         print('')
 
+        previous_tool_output = tool_output
         memorized_tool_outputs.append({
             "action_iteration_time": action_iteration_time,
             "thought": action_plan['thought'],
             "action": action_plan['action'],
             "action_input": action_plan['action_input'],
-            "tool_output": tool_output if target_tool.name == 'terminal' or target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
+            "tool_output": tool_output if target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
         })
 
         error_in_previous_time = None
