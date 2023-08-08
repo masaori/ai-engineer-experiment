@@ -112,7 +112,6 @@ def main():
                     - Make a pull request to the main branch.
     """ if task_type == "write_test" else f"""
                 Please write only one test file in this task following the steps below:
-                - Move to {project_path} and make sure that you are in the correct directory.
                 - Delete all local branch
                 - Update the repository to latest
                 - Create your own branch with task ID

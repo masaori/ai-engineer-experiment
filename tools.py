@@ -77,7 +77,7 @@ class ShellTool(BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
         """Run commands and return final output."""
-        return self.process.run(commands)
+        return self.process.run(f"""cd {self.project_path} && {commands}""")
 
     async def _arun(
         self,
