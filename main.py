@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '-p', '--project_path', help='The absolute path to the project you want to work on', required=True)
 parser.add_argument(
-    '-f', '--file_path', help='The absolute path to the file you want to work on', required=True)
+    '-f', '--file_path', help='The absolute path to the file you want to work on', required=False)
 parser.add_argument(
     '-d', '--dir_path', help='The absolute path to the directory you want to work on', required=False)
 parser.add_argument(
@@ -40,14 +40,7 @@ def main():
     tools: list[BaseTool] = [
         ShellTool(
             project_path=args.project_path,
-            description="""Use this to run shell commands.
-
-            Input Format (Array in JSON string):
-            [
-                "command A",
-                "command B",
-            ]
-        """),
+            description="""Use this to run shell commands."""),
         ReadFileTool(description="""Use this to read file from specific absolute path.
             Please make sure that the file exists with using ListDirectoryTool.
         """),
@@ -104,52 +97,58 @@ def main():
     # """
 
     what_i_want_you_to_do = f"""
-                0. Make your own branch
-                1. Write a test file for {file_path} with jest
+                - Make your own branch
+                - Write a test file for {file_path} with jest
                     - Write a test file at the same directory as the specified file
                     - Aim to write a test file that covers as much of the test cases as possible.
-                2. Check your Test file
+                - Check your Test file
                     - Check if the transpiling succeeds.
                     - Check if your tests pass correctly.
                     - If it fails, Fix your test file.
-                3. Commit your Test file and Make Pull Request
+                - Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, Commit your test file.
                     - Make a pull request to the main branch.
     """ if task_type == "write_test" else f"""
-                0. Make your own branch
-                1. Find the ts file in {dir_path} which doesn't have a test.ts file.
-                2. Write a test file for the file with jest
+                Please write only one test file in this task following the steps below:
+                - Move to {project_path}
+                - Execute git fetch
+                - Create your own branch by executing git checkout -b <YOUR_BRANCH_NAME> origin/main
+                - Find the .ts file in {dir_path} which doesn't have a test.ts file.
+                - Write a test file for the file with jest
                     - Write a test file at the same directory as the specified file
                     - Aim to write a test file that covers as much of the test cases as possible.
-                3. Check your Test file
+                - Check your Test file
                     - Check if the transpiling succeeds.
                     - Check if your tests pass correctly.
                     - If it fails, Fix your test file.
-                4. Commit your Test file and Make Pull Request
+                - Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, Commit your test file.
                     - Make a pull request to the main branch.
     """ if task_type == "find_and_write_test" else f"""
-                0. Make your own branch
-                1. Split the file {file_path} into multiple files for each exported type definition.
+                - Make your own branch
+                - Split the file {file_path} into multiple files for each exported type definition.
                     - Each file should include only one type definition.
                     - Name each file as <file_name>.<type_name>.ts
                     - Put each file into the same directory as the specified file.
-                2. Check if the transpiling succeeds.
-                3. DO NOT forget to commit your changes and Make Pull Request
+                - Check if the transpiling succeeds.
+                - DO NOT forget to commit your changes and Make Pull Request
     """ if task_type == "split_file" else None
 
     if what_i_want_you_to_do is None:
         raise Exception(
             f"Invalid task type. Please specify one of the following: write_test, split_file")
 
-    memorized_files = []
+    memorized_tool_outputs = []
     error_in_previous_time = None
-    action_iteration_time = 0
+    action_iteration_time = 1
     while True:
         print('')
         print('')
         print(
             f"==== Start Action ==== {action_iteration_time}")
+        # print('== Memory ==')
+        # print(json.dumps(memorized_tool_outputs, indent=4))
+        print('')
         action_iteration_time += 1
 
         prompt = f"""
@@ -182,7 +181,7 @@ def main():
                 {output_instruction}
 
             Memorized Files:
-                {json.dumps(memorized_files, indent=4)}
+                {json.dumps(memorized_tool_outputs, indent=4)}
         """ if error_in_previous_time is None else f"""
             Please address the error in previous time:
                 {json.dumps(error_in_previous_time, indent=4)}
@@ -196,22 +195,22 @@ def main():
                 start_time = time.time()
                 action_plan_output = llm.predict(prompt)
                 elapsed_time = time.time() - start_time
-                print(f"    Request Time: {elapsed_time}")
+                # print(f"    Request Time: {elapsed_time}")
             except InvalidRequestError as e:
                 # token limit exceeded
                 print(f"==== Token Limit Exceeded ==== {e}")
                 # remove the oldest action plan from history
-                memorized_files.pop(0)
+                memorized_tool_outputs.pop(0)
                 time.sleep(60)
                 continue
             except Exception as e:
                 raise e
 
-            print("    total_cost:", callback.total_cost)
-            print("    total_tokens:", callback.total_tokens)
-            print("    prompt_tokens:", callback.prompt_tokens)
-            print("    successful_requests:", callback.successful_requests)
-            print("    completion_tokens:", callback.completion_tokens)
+            # print("    total_cost:", callback.total_cost)
+            # print("    total_tokens:", callback.total_tokens)
+            # print("    prompt_tokens:", callback.prompt_tokens)
+            # print("    successful_requests:", callback.successful_requests)
+            # print("    completion_tokens:", callback.completion_tokens)
 
         try:
             action_plan = json.loads(action_plan_output)
@@ -219,13 +218,14 @@ def main():
                 print('==== Final Answer ====')
                 print(json.dumps(action_plan, indent=4))
                 print('==== Action Plan History ====')
-                print(json.dumps(memorized_files, indent=4))
+                print(json.dumps(memorized_tool_outputs, indent=4))
                 break
 
             print('==== Action Plan ====')
             print(f"Thought: {action_plan['thought']}")
             print(f"Action: {action_plan['action']}")
             print(f"Action Input: {action_plan['action_input']}")
+            print('')
         except json.decoder.JSONDecodeError as e:
             print(f"==== JSON Decode Error ==== {action_plan_output}")
             error_in_previous_time = {
@@ -257,16 +257,14 @@ def main():
             }
             continue
 
-        print(f"==== Using tool: {target_tool.name} ====")
-
         action_plan_input: object
         try:
             action_plan_input = json.loads(action_plan['action_input'])
         except Exception as e:
             action_plan_input = action_plan['action_input']
 
-        print('==== Action Plan Input ====')
-        print(json.dumps(action_plan_input, indent=2))
+        print(
+            f"== Using Tool: {target_tool.name} {json.dumps(action_plan_input, indent=2)} ==")
 
         # Run the tool
         try:
@@ -274,17 +272,17 @@ def main():
         except Exception as e:
             tool_output = str(e)
 
-        print('==== Tool Output ====')
+        print('== Tool Output ==')
         print(tool_output)
+        print('')
 
-        if target_tool.name == 'read_and_memorize_file':
-            memorized_files.append({
-                "action_iteration_time": action_iteration_time,
-                "thought": action_plan['thought'],
-                "action": action_plan['action'],
-                "action_input": action_plan['action_input'],
-                "tool_output": tool_output,
-            })
+        memorized_tool_outputs.append({
+            "action_iteration_time": action_iteration_time,
+            "thought": action_plan['thought'],
+            "action": action_plan['action'],
+            "action_input": action_plan['action_input'],
+            "tool_output": tool_output,
+        })
 
         error_in_previous_time = None
 
