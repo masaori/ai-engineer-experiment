@@ -110,9 +110,9 @@ def main():
                     - Make a pull request to the main branch.
     """ if task_type == "write_test" else f"""
                 Please write only one test file in this task following the steps below:
-                - Move to {project_path}
-                - Execute git fetch
-                - Create your own branch by executing git checkout -b <YOUR_BRANCH_NAME> origin/main
+                - Delete all local branch
+                - Update the repository to latest
+                - Create your own branch
                 - Find the .ts file in {dir_path} which doesn't have a test.ts file.
                 - Write a test file for the file with jest
                     - Write a test file at the same directory as the specified file
@@ -165,8 +165,12 @@ def main():
                     - `cd {project_path} && npx jest <path/to/test/file> --coverage --collectCoverageFrom=<path/to/test/file>
                 - If you want to check current git status, you can use the following shell command:
                     - `cd {project_path} && git status`
-                - If you want to make your own branch, please run the following command:
-                    - `cd {project_path} && git checkout -b <your branch name>`
+                - If you want to delete all local branches, you can use the following shell command:
+                    - `cd {project_path} && git branch | xargs git branch -D`
+                - If you want to update the repository to latest, you can use the following shell command:
+                    - `cd {project_path} && git fetch`
+                - If you want to make your own branch from main branch, please run the following command:
+                    - `cd {project_path} && git checkout -b <your branch name>` origin/main
                 - If you want to update your branch, please run the following command:
                     - `cd {project_path} && git pull --rebase origin main`
                 - If you want to commit your changes, please run the following command:
