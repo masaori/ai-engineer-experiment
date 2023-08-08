@@ -1,5 +1,6 @@
 import json
 import time
+import datetime
 from langchain.callbacks import get_openai_callback
 from langchain.tools.file_management import (
     ReadFileTool,
@@ -66,6 +67,7 @@ def main():
     file_path = args.file_path
     dir_path = args.dir_path
     task_type = args.task_type
+    task_id = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     output_instruction = f"""
                 When responding to me, please output a response in the following JSON format:
                 {{
@@ -110,10 +112,11 @@ def main():
                     - Make a pull request to the main branch.
     """ if task_type == "write_test" else f"""
                 Please write only one test file in this task following the steps below:
+                - Make sure that you are in the {project_path}
                 - Delete all local branch
                 - Update the repository to latest
-                - Create your own branch
-                - Find the .ts file in {dir_path} which doesn't have a test.ts file.
+                - Create your own branch with task ID
+                - Find the .ts file in {dir_path} which doesn't have a *.test.ts file.
                 - Write a test file for the file with jest
                     - Write a test file at the same directory as the specified file
                     - Aim to write a test file that covers as much of the test cases as possible.
@@ -138,6 +141,45 @@ def main():
         raise Exception(
             f"Invalid task type. Please specify one of the following: write_test, split_file")
 
+    base_prompt = f"""
+            Project Path:
+                {project_path}
+            
+            Task ID:
+                {task_id}
+
+            What I want you to do:
+                {what_i_want_you_to_do}
+
+            Shell Command Tips:
+                - If you want to check current directory:
+                    - `pwd`
+                - If you want to check if the typescript code transpiles properly:
+                    - `npx tsc --noEmit`
+                - If you want to check if the test code succeeds:
+                    - `npx jest <path/to/test/file> --coverage --collectCoverageFrom=<path/to/test/file>
+                - If you want to check current git status:
+                    - `git status`
+                - If you want to delete all local branches:
+                    - `git branch | xargs git branch -D`
+                - If you want to update the repository to latest:
+                    - `git fetch`
+                - If you want to make your own branch from main branch:
+                    - `git checkout -b <your branch name>` origin/main
+                - If you want to update your branch:
+                    - `git pull --rebase origin main`
+                - If you want to commit your changes:
+                    - `git add . && git commit -m "<appropriate commit message>" && git push -u origin <your branch name>`
+                - If you want to make Pull Request:
+                    - `gh pr create --base main --title "<Your PR title>" --body "<Your PR body>"`
+
+            Tools you can use:
+            {json.dumps(tool_descriptions, indent=4)}
+
+            Output:
+                {output_instruction}
+    """
+    previous_tool_output = None
     memorized_tool_outputs = []
     error_in_previous_time = None
     action_iteration_time = 1
@@ -151,47 +193,14 @@ def main():
         print('')
         action_iteration_time += 1
 
-        prompt = f"""
-            Project Path:
-            {project_path}
-
-            What I want you to do:
-            {what_i_want_you_to_do}
-
-            Tips:
-                - If you want to check if the typescript code transpiles properly, please run the following command:
-                    - `cd {project_path} && npx tsc --noEmit`
-                - If you want to check if the test code succeeds, please run the following command:
-                    - `cd {project_path} && npx jest <path/to/test/file> --coverage --collectCoverageFrom=<path/to/test/file>
-                - If you want to check current git status, you can use the following shell command:
-                    - `cd {project_path} && git status`
-                - If you want to delete all local branches, you can use the following shell command:
-                    - `cd {project_path} && git branch | xargs git branch -D`
-                - If you want to update the repository to latest, you can use the following shell command:
-                    - `cd {project_path} && git fetch`
-                - If you want to make your own branch from main branch, please run the following command:
-                    - `cd {project_path} && git checkout -b <your branch name>` origin/main
-                - If you want to update your branch, please run the following command:
-                    - `cd {project_path} && git pull --rebase origin main`
-                - If you want to commit your changes, please run the following command:
-                    - `cd {project_path} && git add . && git commit -m "<appropriate commit message>" && git push -u origin <your branch name>`
-                - If you want to make Pull Request, you can use the following shell command:
-                    - `cd {project_path} && gh pr create --base main --title "<Your PR title>" --body "<Your PR body>"`
-
-            Tools you can use:
-            {json.dumps(tool_descriptions, indent=4)}
-
-            Output:
-                {output_instruction}
-
-            Memorized Files:
+        prompt = base_prompt + f"""
+            Previous Tool Output:
+                {json.dumps(previous_tool_output, indent=4)}
+            Memorized Tool Outputs:
                 {json.dumps(memorized_tool_outputs, indent=4)}
         """ if error_in_previous_time is None else f"""
             Please address the error in previous time:
                 {json.dumps(error_in_previous_time, indent=4)}
-
-            Output:
-                {output_instruction}
         """
 
         with get_openai_callback() as callback:
@@ -285,7 +294,7 @@ def main():
             "thought": action_plan['thought'],
             "action": action_plan['action'],
             "action_input": action_plan['action_input'],
-            "tool_output": tool_output,
+            "tool_output": tool_output if target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
         })
 
         error_in_previous_time = None
