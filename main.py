@@ -17,8 +17,8 @@ from tools import ReadAndMemorizeFileTool, ShellTool
 
 
 parser = argparse.ArgumentParser(
-    prog='Auto Test Writer',
-    description='Write a test file automatically',
+    prog='AI Engineer Experiment',
+    description='Let\'s work together with AI Engineer!',
     epilog='Enjoy the program! :)')
 parser.add_argument(
     '-p', '--project_path', help='The absolute path to the project you want to work on', required=True)
@@ -116,14 +116,12 @@ def main():
                 - Update the repository to latest
                 - Create your own branch including Task ID
                 - Find the .ts file in {dir_path} which doesn't have a *.test.ts file.
-                - Write a test file for the file with jest
+                - Read target file and the imported files, and write a test file for the file with jest
                     - Write a test file at the same directory as the specified file
                     - Aim to write a test file that covers as much of the test cases as possible.
-                - Check your Test file
-                    - Check if the transpiling succeeds.
-                    - Check if your tests pass correctly.
-                    - If it fails, Fix your test file.
-                    - If the coverage is under 70%, please try to increase the coverage.
+                - Check if the transpiling succeeds.
+                - Check if your tests pass correctly and fix it if it failed.
+                - Please make sure the coverage of your test file is beyond 70% at least.
                 - Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, Commit your test file.
                     - Make a pull request to the main branch.
@@ -157,7 +155,7 @@ def main():
                 - If you want to check if the typescript code transpiles properly:
                     - `npx tsc --noEmit`
                 - If you want to check if the test code succeeds:
-                    - `npx jest <path/to/test/file> --coverage --collectCoverageFrom=<path/to/test/file>
+                    - `npx jest <path/to/test/file> --coverage
                 - If you want to check current git status:
                     - `git status`
                 - If you want to delete all local branches:
@@ -276,8 +274,8 @@ def main():
         except Exception as e:
             action_plan_input = action_plan['action_input']
 
-        print(
-            f"== Using Tool: {target_tool.name} {json.dumps(action_plan_input, indent=2)} ==")
+        # print(
+        #     f"== Using Tool: {target_tool.name} {json.dumps(action_plan_input, indent=2)} ==")
 
         # Run the tool
         try:
