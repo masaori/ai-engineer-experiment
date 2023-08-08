@@ -13,7 +13,7 @@ import os
 import argparse
 from openai.error import InvalidRequestError
 
-from tools import MemorizeShellTool, ReadAndMemorizeFileTool, ShellTool
+from tools import ReadAndMemorizeFileTool, ShellTool
 
 
 parser = argparse.ArgumentParser(
@@ -42,9 +42,6 @@ def main():
         ShellTool(
             project_path=args.project_path,
             description="""Use this to run shell commands when you don't need to memorize the output"""),
-        MemorizeShellTool(
-            project_path=args.project_path,
-            description="""Use this to run shell commands when you need to memorize the output"""),
         ReadFileTool(description="""Use this to read file from specific absolute path.
             Please make sure that the file exists with using ListDirectoryTool.
         """),
@@ -126,6 +123,7 @@ def main():
                     - Check if the transpiling succeeds.
                     - Check if your tests pass correctly.
                     - If it fails, Fix your test file.
+                    - If the coverage is under 70%, please try to increase the coverage.
                 - Commit your Test file and Make Pull Request
                     - After you confirm that your test file is correct, Commit your test file.
                     - Make a pull request to the main branch.
@@ -296,7 +294,7 @@ def main():
             "thought": action_plan['thought'],
             "action": action_plan['action'],
             "action_input": action_plan['action_input'],
-            "tool_output": tool_output if target_tool.name == 'terminal_and_memorize' or target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
+            "tool_output": tool_output if target_tool.name == 'terminal' or target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
         })
 
         error_in_previous_time = None

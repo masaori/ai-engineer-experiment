@@ -90,13 +90,6 @@ class ShellTool(BaseTool):
         )
 
 
-class MemorizeShellTool(ShellTool):
-    """Execute shell commands and memorize the output."""
-
-    name: str = "terminal_and_memorize"
-    """Name of tool."""
-
-
 class ReadAndMemorizeFileInput(BaseModel):
     """Input for ReadAndMemorizeFileTool."""
 
