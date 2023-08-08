@@ -13,7 +13,7 @@ import os
 import argparse
 from openai.error import InvalidRequestError
 
-from tools import ReadAndMemorizeFileTool, ShellTool
+from tools import MemorizeShellTool, ReadAndMemorizeFileTool, ShellTool
 
 
 parser = argparse.ArgumentParser(
@@ -41,7 +41,10 @@ def main():
     tools: list[BaseTool] = [
         ShellTool(
             project_path=args.project_path,
-            description="""Use this to run shell commands."""),
+            description="""Use this to run shell commands when you don't need to memorize the output"""),
+        MemorizeShellTool(
+            project_path=args.project_path,
+            description="""Use this to run shell commands when you need to memorize the output"""),
         ReadFileTool(description="""Use this to read file from specific absolute path.
             Please make sure that the file exists with using ListDirectoryTool.
         """),
@@ -293,7 +296,7 @@ def main():
             "thought": action_plan['thought'],
             "action": action_plan['action'],
             "action_input": action_plan['action_input'],
-            "tool_output": tool_output if target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
+            "tool_output": tool_output if target_tool.name == 'terminal_and_memorize' or target_tool.name == 'read_and_memorize_file' or target_tool.name == 'list_directory' else '(omitted)',
         })
 
         error_in_previous_time = None
